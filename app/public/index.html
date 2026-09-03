@@ -55,8 +55,23 @@
 </div>
 
 <script>
-async function api(path, opts) {
+function getPassword() {
+  let pw = localStorage.getItem('reelforge_password');
+  while (!pw) {
+    pw = prompt('Enter the Reelforge password:');
+  }
+  localStorage.setItem('reelforge_password', pw);
+  return pw;
+}
+
+async function api(path, opts = {}) {
+  opts.headers = { ...(opts.headers || {}), 'Authorization': 'Bearer ' + getPassword() };
   const res = await fetch(path, opts);
+  if (res.status === 401) {
+    localStorage.removeItem('reelforge_password');
+    alert('Wrong password. Try again.');
+    return api(path, opts);
+  }
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
   return res.json();
 }

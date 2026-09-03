@@ -4,6 +4,18 @@ import { runTopic, runAllActiveTopics, approveRun } from "./pipeline";
 
 const app = new Hono<{ Bindings: Env }>();
 
+// ---- Password check for everything except the GitHub webhook ----
+
+app.use("/api/*", async (c, next) => {
+  if (c.req.path === "/api/webhook/render-complete") return next();
+
+  const provided = c.req.header("Authorization")?.replace(/^Bearer\s+/i, "");
+  if (!provided || provided !== c.env.DASHBOARD_PASSWORD) {
+    return c.json({ error: "Wrong or missing password" }, 401);
+  }
+  return next();
+});
+
 // ---- Dashboard data ----
 
 app.get("/api/topics", async (c) => {

@@ -12,6 +12,7 @@ export interface Env {
   YOUTUBE_CLIENT_SECRET: string;
   YOUTUBE_REFRESH_TOKEN: string;
   WEBHOOK_SECRET: string;
+  DASHBOARD_PASSWORD: string;
   APP_URL: string; // this Worker's own live URL, used to build the webhook callback URL
 }
 

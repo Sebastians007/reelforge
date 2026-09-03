@@ -1,0 +1,61 @@
+name: Make Video
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        required: true
+      topic_name:
+        required: true
+      story_title:
+        required: true
+      story_link:
+        required: false
+      story_summary:
+        required: true
+      aspect_ratio:
+        required: false
+      voice_id:
+        required: true
+      webhook_url:
+        required: true
+      webhook_secret:
+        required: true
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: render
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - run: pip install -r requirements.txt
+
+      - name: Render and upload
+        env:
+          RUN_ID: ${{ inputs.run_id }}
+          TOPIC_NAME: ${{ inputs.topic_name }}
+          STORY_TITLE: ${{ inputs.story_title }}
+          STORY_LINK: ${{ inputs.story_link }}
+          STORY_SUMMARY: ${{ inputs.story_summary }}
+          ASPECT_RATIO: ${{ inputs.aspect_ratio }}
+          VOICE_ID: ${{ inputs.voice_id }}
+          WEBHOOK_URL: ${{ inputs.webhook_url }}
+          WEBHOOK_SECRET: ${{ inputs.webhook_secret }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: python render.py

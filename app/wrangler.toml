@@ -1,0 +1,31 @@
+name = "reelforge"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+workers_dev = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "reelforge-db"
+database_id = "58af4d36-4362-420d-a2cc-5c0ac1ce0260"
+
+[triggers]
+crons = ["0 13 * * *"]
+
+# Custom domain route — uncomment and set your own domain once it's a Cloudflare zone:
+# [[routes]]
+# pattern = "your-domain.com"
+# custom_domain = true
+
+# Secrets (set with: npx wrangler secret put <NAME>)
+# APP_URL                 - the live URL of this Worker (workers.dev address or custom domain) — used to build the webhook callback URL
+# GITHUB_TOKEN            - personal access token, scoped to trigger workflows on the render repo
+# GITHUB_OWNER            - your GitHub username or org
+# GITHUB_REPO             - "reelforge" (or wherever render/ lives)
+# YOUTUBE_CLIENT_ID
+# YOUTUBE_CLIENT_SECRET
+# YOUTUBE_REFRESH_TOKEN
+# WEBHOOK_SECRET          - shared secret the render job sends back to prove it's really the render job

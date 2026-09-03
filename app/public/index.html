@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Reelforge</title>
+<style>
+  :root { color-scheme: light dark; --bg:#0b0d10; --card:#15181c; --text:#e8eaed; --muted:#8a8f98; --accent:#5b8cff; --ok:#3ecf8e; --err:#ff6b6b; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family: -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  h2 { font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 32px 0 12px; }
+  .card { background: var(--card); border-radius: 10px; padding: 16px; margin-bottom: 10px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 14px; }
+  button { background: var(--accent); color: white; border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+  button.secondary { background: #2a2e35; }
+  button:disabled { opacity: .5; cursor: default; }
+  input { background: #0b0d10; border: 1px solid #2a2e35; color: var(--text); border-radius: 6px; padding: 6px 8px; font-size: 13px; }
+  .status { padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+  .status.queued, .status.rendering { background: #3a3d1a; color: #d7d13a; }
+  .status.uploaded { background: #1a3a3a; color: #3ac9c9; }
+  .status.approved { background: #1a3a20; color: var(--ok); }
+  .status.failed { background: #3a1a1a; color: var(--err); }
+  form.add-topic { display: flex; gap: 8px; flex-wrap: wrap; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<h1>Reelforge</h1>
+<div style="color:var(--muted); font-size:13px;">Turns any topic into a daily video, auto-uploaded to YouTube.</div>
+
+<h2>Topics</h2>
+<div class="card">
+  <table id="topics-table"><thead><tr><th>Name</th><th>RSS Source</th><th>Aspect</th><th>Voice</th><th>Active</th><th></th></tr></thead><tbody></tbody></table>
+</div>
+<div class="card">
+  <form class="add-topic" id="add-topic-form">
+    <input name="name" placeholder="Topic name (e.g. Tech News, Sports Recap)" style="flex:2" required />
+    <input name="rss_source" placeholder="RSS feed URL" style="flex:3" required />
+    <input name="aspect_ratio" placeholder="9:16" style="flex:1" value="9:16" />
+    <input name="voice_id" placeholder="ElevenLabs voice ID" style="flex:1" required />
+    <button type="submit">Add Topic</button>
+  </form>
+</div>
+
+<h2>Pending Approval</h2>
+<div class="card">
+  <table id="pending-table"><thead><tr><th>Topic</th><th>Story</th><th>Video</th><th></th></tr></thead><tbody></tbody></table>
+</div>
+
+<h2>History</h2>
+<div class="card">
+  <table id="history-table"><thead><tr><th>Topic</th><th>Story</th><th>Status</th><th>When</th></tr></thead><tbody></tbody></table>
+</div>
+
+<script>
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+  return res.json();
+}
+
+async function loadTopics() {
+  const topics = await api('/api/topics');
+  const tbody = document.querySelector('#topics-table tbody');
+  tbody.innerHTML = '';
+  for (const t of topics) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = \`
+      <td>\${t.name}</td>
+      <td style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">\${t.rss_source}</td>
+      <td>\${t.aspect_ratio}</td>
+      <td>\${t.voice_id}</td>
+      <td>\${t.active ? 'Yes' : 'No'}</td>
+      <td><button data-run="\${t.id}">Run Now</button> <button class="secondary" data-toggle="\${t.id}">\${t.active ? 'Pause' : 'Resume'}</button></td>
+    \`;
+    tbody.appendChild(tr);
+  }
+  tbody.querySelectorAll('[data-run]').forEach(btn => btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = 'Starting...';
+    try { await api(\`/api/topics/\${btn.dataset.run}/run\`, { method: 'POST' }); await loadRuns(); }
+    catch (e) { alert(e.message); }
+    finally { btn.disabled = false; btn.textContent = 'Run Now'; }
+  }));
+  tbody.querySelectorAll('[data-toggle]').forEach(btn => btn.addEventListener('click', async () => {
+    await api(\`/api/topics/\${btn.dataset.toggle}/toggle\`, { method: 'POST' });
+    await loadTopics();
+  }));
+}
+
+async function loadRuns() {
+  const runs = await api('/api/runs');
+  const pendingBody = document.querySelector('#pending-table tbody');
+  const historyBody = document.querySelector('#history-table tbody');
+  pendingBody.innerHTML = '';
+  historyBody.innerHTML = '';
+
+  for (const r of runs) {
+    if (r.status === 'uploaded') {
+      const tr = document.createElement('tr');
+      tr.innerHTML = \`
+        <td>\${r.topic_name}</td>
+        <td>\${r.story_title || ''}</td>
+        <td>\${r.youtube_video_id ? \`<a href="https://youtu.be/\${r.youtube_video_id}" target="_blank">Preview</a>\` : '-'}</td>
+        <td><button data-approve="\${r.id}">Approve</button></td>
+      \`;
+      pendingBody.appendChild(tr);
+    }
+  }
+  pendingBody.querySelectorAll('[data-approve]').forEach(btn => btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = 'Approving...';
+    try { await api(\`/api/runs/\${btn.dataset.approve}/approve\`, { method: 'POST' }); await loadRuns(); }
+    catch (e) { alert(e.message); btn.disabled = false; btn.textContent = 'Approve'; }
+  }));
+
+  for (const r of runs) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = \`
+      <td>\${r.topic_name}</td>
+      <td>\${r.story_title || ''}</td>
+      <td><span class="status \${r.status}">\${r.status}\${r.error_message ? ': ' + r.error_message : ''}</span></td>
+      <td>\${r.created_at}</td>
+    \`;
+    historyBody.appendChild(tr);
+  }
+}
+
+document.getElementById('add-topic-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  await api('/api/topics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  e.target.reset();
+  await loadTopics();
+});
+
+loadTopics();
+loadRuns();
+setInterval(loadRuns, 10000);
+</script>
+</body>
+</html>
